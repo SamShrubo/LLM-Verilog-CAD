@@ -1,5 +1,10 @@
 API_KEY/githubKey.txt
 test-run1/
 datarun1/
-dataframe.csv
 ds_builder_logs/
+filtered-p1/
+dedupe-test1/
+dedupe-test-512perms/
+dedupe-test-512-2/
+*.csv
+*.json

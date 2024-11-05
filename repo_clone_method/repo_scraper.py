@@ -31,11 +31,11 @@ headers = {
 }
 
 # Define the query parameters
-# licenses  = ['mit', 'apache-2.0', 'gpl-3.0', 'bsd-3-clause', 'mpl-2.0']
-licenses = ['mit']
-# languages = ['Verilog', 'SystemVerilog']
+# tons of options mit and apaches have most
+licenses  = ['mit', 'apache-2.0', 'gpl-2.0', 'gpl-3.0', 'lgpl-2.1', 'lgpl-3.0', 'mpl-2.0', 'unlicense', 
+             'cc0-1.0', 'epl-1.0', 'epl-2.0', 'bsd-2-clause', 'bsd-3-clause', 'bsl-1.0', 'zlib']
 languages = ['Verilog']
-filenames =['.v', '.sv', '.vh', '.vlg', '.verilog']
+filenames =['.v', '.vh', '.vlg', '.verilog']
 
 
 #-----Functions-----#
@@ -83,7 +83,7 @@ def runScraper():
     '''
     This function handles running the scraping script
     '''
-    count = 0
+    count = 0 #incorrect make sure to subtract from this to get the starting value + u r a dingbat
     total_repo_size = 0
     successful = count
     successful_repo_size = 0
@@ -93,7 +93,7 @@ def runScraper():
 
     # Loop through each year from 2008 to the current year
     current_year = datetime.now().year
-    for year in range(2008, current_year+1):
+    for year in range(2023, current_year+1):
         # start_date = f"{year}-01-01"
         # end_date = f"{year}-12-31"
         quarters = [
@@ -176,7 +176,7 @@ def runScraper():
 
                                 # clone into clone dir
                                 # add count into the clone name to prevent failures due to same repo names
-                                clone_path = os.path.join(clone_dir, f"{count}-{repo['name']}")
+                                clone_path = os.path.join(clone_dir, license_, f"{count}-{repo['name']}")
                                 try:
                                     subprocess.run(['git', 'clone', repo['html_url'], clone_path], check=True)
                                     print(f"Successfully cloned {repo['name']} to {clone_path}\n")

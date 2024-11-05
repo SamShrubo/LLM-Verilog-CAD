@@ -12,10 +12,13 @@ import json
 import time
 import sys
 import glob
+import csv
+import dask.dataframe as dd
 from repo_clone_method import repo_scraper
 
 #----Global Vars----#
 log_file = ""
+csv.field_size_limit(10**8)
 
 #----Functions List----#
 
@@ -60,6 +63,37 @@ def filetodf(readFolder, readFile, dataframeName="dataframe.csv", max_length=200
     deletedf("temp_df.csv", False)
     return
 
+def fullfiletodf(readFolder, readFile, dataframeName="dataframe", max_size_gb=1):
+    '''
+    This function is designed to parse an inputted file entirely
+    and append it to a designated `dataframeName` csv file.
+    '''
+    filePath = os.path.join(readFolder, readFile) if readFolder else readFile
+
+    # open read file
+    with open(filePath, encoding='utf-8', errors="ignore") as fd:
+        # read text
+        text = fd.read()
+
+    tempdf = pd.DataFrame({'text' : [text]})
+
+    file_part = 0
+    # while os.path.exists(f"{dataframeName}_part{file_part}.csv"):
+    #     file_part += 1
+    outFileName = f"{dataframeName}_part{file_part}.csv"
+
+    while True:
+        if os.path.exists(outFileName) and os.path.getsize(outFileName) >= (max_size_gb * 1024 ** 3):
+            file_part += 1
+            outFileName = f"{dataframeName}_part{file_part}.csv"
+        else:
+            tempdf.to_csv(outFileName, mode='a', header=not os.path.exists(outFileName), index=False)
+            break
+
+    print(f"\nUpdated {outFileName}'s with file {readFile}.\n\n")
+    deletedf("temp_df.csv", False)
+    return
+
 def deletedf(dfName="dataframe.csv", print_=True):
     '''
     This function deletes the designated dataframe in `dfName`.
@@ -70,19 +104,20 @@ def deletedf(dfName="dataframe.csv", print_=True):
         print("\nDataframe cleared...")
     return
 
-def parseJSON(nameJSON, dfName="dataframe.csv"):
+def parseJSON(nameJSON, dfName="dataframe.csv", chunk_size=100000):
     '''
     This function parses the `dfName` dataframe csv into the
     `nameJSON` json file for the final dataset.
     '''
     # read dataframe
-    df_code = pd.read_csv(dfName)
+    df = pd.read_csv(dfName)
     # open output .json (this is the code from Shailja)
     print("Making JSON...")
-    total_rows = len(df_code['text'].values)
+    total_rows = len(df['text'].values)
+    # total_rows = len(df_code['text'].values)
     index = 0
     with open(nameJSON,'a') as f:
-        for row in df_code['text'].values:
+        for row in df['text'].values:
             #print("Adding row...")
             # adds dictionary
             dic={"text":str(row)}
@@ -93,12 +128,21 @@ def parseJSON(nameJSON, dfName="dataframe.csv"):
             index += 1
             
     f.close()
-    print(f"\n\nJSON Complete : written to {os.path.dirname(f'{nameJSON}.json')+nameJSON}...")
+    print(f"\n\nJSON Complete : written to {os.path.dirname(nameJSON)+nameJSON}...")
     # clear dataframe after use
     deleteit = input("Would you like to delete the old dataframe now?\n.\n.\n.\n(Y/N) >> ")
     if deleteit == "Y" or deleteit == "y":
         deletedf(dfName)
     return
+
+def getdirsize(target):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(target):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            if not os.path.islink(filepath):
+                total_size += os.path.getsize(filepath)
+    return total_size
 
 def loading(current, total, length=30):
     '''
@@ -123,14 +167,14 @@ def builderInitLog():
     while os.path.exists(os.path.join("ds_builder_logs", f'{logName}{logNum}.txt')):
         logNum += 1
     log_file = os.path.join("ds_builder_logs", f'{logName}{logNum}.txt')
-    logfd = open(log_file, 'a')
+    logfd = open(log_file, 'a', encoding='utf-8', errors='ignore')
     logfd.close()
 
 def builderWriteLog(in_string):
     '''
     This helper function writes whatever string is inputted into the log file
     '''
-    logfd = open(log_file, 'a')
+    logfd = open(log_file, 'a', encoding='utf-8', errors='ignore')
     entry = f'\n{time.time()} -- {in_string}\n-'
     logfd.write(entry)
     logfd.close()
@@ -170,7 +214,7 @@ def runDfManager():
         elif uinDf.lower() == 'raf':
             print("Instructions:\n- You will first enter the target dataframe and directory in which your files are stored\n- Next you must specify the file types you are wishing to add into your target dataframe")
             print("WARN: This functionality will recursively read files through any subdirectories within your target data directory\n.\n")
-            target_df    = input("What is your target dataframe name/path (relative to the current directory)?\n.\n.\n.\n(ex. .\\dataframe.csv)>> ")
+            target_df    = input("What is your target dataframe name/path (relative to the current directory)?\n.\n.\n.\n(ex. .\\dataframe)>> ")
             target_dir   = input("What is your target data directory path (relative to the current directory)?\n.\n.\n.\n(ex. .\\all_my_files_here)>> ")
             target_types = input("Enter however many file types you want to target separated by spaces,\nto read all files regardless of type just press <enter> without typing\n.\n.\n.\n(ex. '*.txt *.v *.csv')>> ")
             try:
@@ -182,7 +226,7 @@ def runDfManager():
                 for ftype in type_list:
                     for ifile in glob.glob(os.path.join(target_dir, '**', f'{ftype}'), recursive=True):
                         print(f"Reading {ifile} into dataframe...")
-                        filetodf("", ifile, target_df)
+                        fullfiletodf("", ifile, target_df)
                         file_count += 1
                 end_time = time.time()
                 log_entry = f'Completed parsing {file_count} files within: {os.path.relpath(target_dir)} into target dataframe: {os.path.relpath(target_df)} in {end_time - start_time} seconds'
@@ -221,16 +265,16 @@ def runDsManager():
         if uinDs.lower() == 'ac':
             dfName = input("Instructions\n- You will first select a path to the dataframe you wish to build from\n- Then you will select the name/path of the destination dataset (can be an existing dataset or a new one)\n.\n.\n.\nWhat is the name/path to your dataframe (relative to the current directory)?\n(ex. .\\df_here\\dataframe.csv)>> ")
             JSONname = input("What is/will be the name/path your JSON dataset?\n.\n.\n.\n(ex. .\\New_Dataset.json)>> ")
-            try:
-                start_time = time.time()
-                parseJSON(JSONname, dfName)
-                end_time = time.time()
-                log_entry = f"Completed parsing dataframe: {os.path.relpath(dfName)} into dataset: {os.path.relpath(JSONname)} in {end_time - start_time} seconds"
-                print(log_entry)
-                builderWriteLog(log_entry)
-            except:
-                print("Invalid Argument: File name")
-                continue
+            # try:
+            start_time = time.time()
+            parseJSON(JSONname, dfName)
+            end_time = time.time()
+            log_entry = f"Completed parsing dataframe: {os.path.relpath(dfName)} into dataset: {os.path.relpath(JSONname)} in {end_time - start_time} seconds"
+            print(log_entry)
+            builderWriteLog(log_entry)
+            # except:
+            #     print("Invalid Argument: File name")
+            #     continue
         elif uinDs.lower() == 'stats':
             dsPath = input("WIP enter to continue")
             # this will eventually gather meaningful metrics on an input dataset
@@ -275,20 +319,27 @@ def runSpManager():
                 for ifile in glob.glob(os.path.join(target_dir, '**', f'{ftype}'), recursive=True):
                     # dest_fname = str(file_count) + os.path.basename(dest_fname)
                     # print(dest_fname)
+
                     destination_file = os.path.join(filter_dir, f'{file_count}-{os.path.basename(ifile)}')
-                    with open(ifile, 'r') as src:
-                        with open(destination_file, 'w') as dst:
-                            # Read from source and write to destination in chunks
-                            print(f"Reading {ifile} into {destination_file}")
-                            for line in src:
-                                dst.write(line)
-                    total_size += os.path.getsize(destination_file)
-                    file_count += 1
+                    try:
+                        with open(ifile, 'r', encoding='utf-8', errors="ignore") as src:
+                            with open(destination_file, 'w', encoding='utf-8', errors="ignore") as dst:
+                                # Read from source and write to destination in chunks
+                                print(f"Reading {ifile} into {destination_file}")
+                                for line in src:
+                                    dst.write(line)
+                        total_size += os.path.getsize(destination_file)
+                        file_count += 1
+                    except:
+                        log_entry = f"Failed to copy source file {ifile}"
+                        print(log_entry)
+                        builderWriteLog(log_entry)
+                        continue
+
             end_time = time.time()
-            # log_entry = f'Completed filtering {file_count} in  seconds'
-            # print(log_entry)
-            print('yes')
-            # builderWriteLog(log_entry)
+            log_entry = f'Completed filtering {file_count} files in {end_time - start_time} seconds'
+            print(log_entry)
+            builderWriteLog(log_entry)
             # except:
             #     print("Invalid Argument: File Name")
         elif uinSp.lower() == 'h':
