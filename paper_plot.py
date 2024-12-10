@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import csv
 
 array1 = []
-with open('row_lengths.csv', mode='r', newline='') as filed:
+with open('row_tokens.csv', mode='r', newline='') as filed:
         reader = csv.DictReader(filed)
         for row in reader:
             array1.append(int(row["row_length"]))
 array2 = []
-with open('row_lengths_verigen.csv', mode='r', newline='') as filed:
+with open('verigen_row_tokens.csv', mode='r', newline='') as filed:
         reader = csv.DictReader(filed)
         for row in reader:
             array2.append(int(row["row_length"]))

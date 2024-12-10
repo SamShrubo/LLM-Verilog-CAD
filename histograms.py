@@ -22,8 +22,6 @@ def loading(current, total, length=30):
 row_lengths = []
 
 if uin.lower() == 'y':
-    
-    fd = open("API_KEY/huggingface.txt", 'r')
     login()
 
     # Load the dataset with streaming enabled
