@@ -28,7 +28,6 @@ if uin.lower() == 'y':
     dataset = load_dataset('shailja/Verilog_Github', split='train', streaming=True)
     # Collect row lengths
     
-
     # Open a CSV file to save lengths
     with open('row_lengths_verigen.csv', mode='w', newline='') as filed:
         writer = csv.writer(filed)
